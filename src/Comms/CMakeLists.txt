@@ -37,8 +37,17 @@ else()
             UdpIODevice.h
     )
 
-    if(NOT ANDROID AND NOT IOS)
-        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::SerialPort)
+    # Try using Qt standard SerialPort instead of custom implementation
+    if(NOT IOS)
+        if(TARGET Qt6::SerialPort)
+            target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::SerialPort)
+            message(STATUS "Using Qt6::SerialPort (including Android support in Qt 6.8+)")
+            if(ANDROID)
+                target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE QGC_USE_QT_SERIAL_ON_ANDROID)
+            endif()
+        else()
+            message(WARNING "Qt6::SerialPort not available")
+        endif()
     endif()
 endif()
 

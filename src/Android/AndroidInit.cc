@@ -1,5 +1,6 @@
 #include "AndroidInterface.h"
-#ifndef QGC_NO_SERIAL_LINK
+#if !defined(QGC_NO_SERIAL_LINK) && !defined(QGC_USE_QT_SERIAL_ON_ANDROID)
+    // Only include custom Android serial when not using Qt standard SerialPort
     #include "AndroidSerial.h"
 #endif
 #include "JoystickAndroid.h"
@@ -104,7 +105,8 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved)
 
     AndroidInterface::setNativeMethods();
 
-    #ifndef QGC_NO_SERIAL_LINK
+    #if !defined(QGC_NO_SERIAL_LINK) && !defined(QGC_USE_QT_SERIAL_ON_ANDROID)
+        // Only initialize custom Android serial when not using Qt standard SerialPort
         AndroidSerial::setNativeMethods();
     #endif
 

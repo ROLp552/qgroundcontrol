@@ -12,10 +12,13 @@
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QString>
 
-#ifdef Q_OS_ANDROID
-#include "qserialport.h"
+// Qt 6.8+ supports SerialPort on Android
+#if defined(Q_OS_ANDROID) && !defined(QGC_USE_QT_SERIAL_ON_ANDROID)
+    // Use custom Android implementation (old way)
+    #include "qserialport.h"
 #else
-#include <QtSerialPort/QSerialPort>
+    // Use Qt standard SerialPort (Windows/Linux/macOS, and Android with Qt 6.8+)
+    #include <QtSerialPort/QSerialPort>
 #endif
 
 #include "LinkConfiguration.h"

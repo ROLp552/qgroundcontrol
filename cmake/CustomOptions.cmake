@@ -34,6 +34,7 @@ option(QGC_ENABLE_BLUETOOTH "Enable Bluetooth Links" ON) # Qt6Bluetooth_FOUND
 option(QGC_ZEROCONF_ENABLED "Enable ZeroConf Compatibility" OFF)
 option(QGC_AIRLINK_DISABLED "Disable AIRLink" ON)
 option(QGC_NO_SERIAL_LINK "Disable Serial Links" OFF) # NOT IOS AND Qt6SerialPort_FOUND
+option(QGC_USE_QT_SERIAL_ON_ANDROID "Use Qt Serial" ON)
 
 # Video
 option(QGC_ENABLE_UVC "Enable UVC Devices" ON) # Qt6Multimedia_FOUND
