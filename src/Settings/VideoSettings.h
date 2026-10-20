@@ -25,6 +25,8 @@ public:
     DEFINE_SETTINGFACT(rtspUrl)
     DEFINE_SETTINGFACT(aspectRatio)
     DEFINE_SETTINGFACT(videoFit)
+    DEFINE_SETTINGFACT(uvcRotation)
+    DEFINE_SETTINGFACT(uvcFit)
     DEFINE_SETTINGFACT(gridLines)
     DEFINE_SETTINGFACT(showRecControl)
     DEFINE_SETTINGFACT(recordingFormat)

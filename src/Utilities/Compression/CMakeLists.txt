@@ -22,7 +22,7 @@ endif()
 CPMAddPackage(
     NAME zlib
     GITHUB_REPOSITORY madler/zlib
-    GIT_TAG develop
+    GIT_TAG 473f78532aed8f5a8d55cd6e7b305160db9cf742 # as of QGC v5.0.8 (2025-10-08)
     OPTIONS
         "ZLIB_BUILD_TESTING OFF"
         "ZLIB_BUILD_SHARED OFF"

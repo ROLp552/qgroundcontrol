@@ -25,6 +25,7 @@ SettingsPage {
     property string _videoSource:               _videoSettings.videoSource.rawValue
     property bool   _isGST:                     _videoManager.gstreamerEnabled
     property bool   _isStreamSource:            _videoManager.isStreamSource
+    property bool   _isUvc:                     _videoManager.isUvc
     property bool   _isUDP264:                  _isStreamSource && (_videoSource === _videoSettings.udp264VideoSource)
     property bool   _isUDP265:                  _isStreamSource && (_videoSource === _videoSettings.udp265VideoSource)
     property bool   _isRTSP:                    _isStreamSource && (_videoSource === _videoSettings.rtspVideoSource)
@@ -90,6 +91,22 @@ SettingsPage {
             label:              qsTr("Aspect Ratio")
             fact:               _videoSettings.aspectRatio
             visible:            !_videoAutoStreamConfig && _isStreamSource && _videoSettings.aspectRatio.visible
+        }
+
+        LabelledFactComboBox {
+            Layout.fillWidth:   true
+            label:              qsTr("Rotation")
+            fact:               _videoSettings.uvcRotation
+            indexModel:         false
+            visible:            _isUvc && fact.visible
+        }
+
+        LabelledFactComboBox {
+            Layout.fillWidth:   true
+            label:              qsTr("Video Fit")
+            fact:               _videoSettings.uvcFit
+            indexModel:         false
+            visible:            _isUvc && fact.visible
         }
 
         FactCheckBoxSlider {

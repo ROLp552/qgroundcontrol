@@ -63,6 +63,24 @@
     "default":     1
 },
 {
+    "name":             "uvcRotation",
+    "shortDesc":        "Local Video Rotation",
+    "longDesc":         "Rotate the local video device (UVC / HDMI input / Android camera) image by the selected amount. Defaults to 270 for the RadioMaster AX12 HDMI input.",
+    "type":             "uint32",
+    "enumStrings":      "0°,90°,180°,270°",
+    "enumValues":       "0,90,180,270",
+    "default":          270
+},
+{
+    "name":             "uvcFit",
+    "shortDesc":        "Local Video Fit",
+    "longDesc":         "How the local video device image is scaled to the display. Fit shows the whole image, Fill crops to fill the screen, Stretch ignores the aspect ratio.",
+    "type":             "uint32",
+    "enumStrings":      "Fit,Fill,Stretch",
+    "enumValues":       "0,1,2",
+    "default":          0
+},
+{
     "name":             "showRecControl",
     "shortDesc": "Show Video Record Control",
     "longDesc":  "Show recording control in the UI.",

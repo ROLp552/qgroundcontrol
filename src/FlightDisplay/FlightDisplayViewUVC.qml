@@ -14,23 +14,15 @@ import QGroundControl
 
 Rectangle {
     id:                 _root
-    width:              parent.width
-    height:             parent.height
+    anchors.fill:       parent
     color:              Qt.rgba(0,0,0,0.75)
     clip:               true
-    anchors.centerIn:   parent
     visible:            _videoManager.isUvc
 
-    property var _videoManager: QGroundControl.videoManager
-
-    function adjustAspectRatio() {
-        //-- Set aspect ratio
-        var resolution = camera.cameraFormat.resolution
-        if (resolution.height > 0 && resolution.width > 0) {
-            var aspectRatio = resolution.width / resolution.height
-            _root.height = parent.height * aspectRatio
-        }
-    }
+    property var _videoManager:     QGroundControl.videoManager
+    property var _videoSettings:    QGroundControl.settingsManager.videoSettings
+    property int _rotation:         _videoSettings.uvcRotation.rawValue
+    property int _fit:              _videoSettings.uvcFit.rawValue
 
     MediaDevices {
         id: mediaDevices
@@ -51,25 +43,18 @@ Rectangle {
             id:             camera
             cameraDevice:   mediaDevices.findCameraDevice(_videoManager.uvcVideoSourceID)
             active:         _videoManager.isUvc
-
-            onCameraDeviceChanged: {
-                if (active) {
-                    adjustAspectRatio()
-                }
-            }
-
-            onActiveChanged: {
-                if (active) {
-                    adjustAspectRatio()
-                }
-            }
         }
         videoOutput: videoOutput
     }
 
+    // Some devices (e.g. RadioMaster AX12 HDMI input) expose the video input as a phone
+    // camera with a sensor orientation, which shows the image rotated. VideoOutput applies
+    // the extra rotation and keeps the aspect ratio correct for the selected fill mode.
     VideoOutput {
         id:             videoOutput
         anchors.fill:   parent
-        fillMode:       VideoOutput.PreserveAspectCrop
+        orientation:    _rotation
+        fillMode:       _fit === 1 ? VideoOutput.PreserveAspectCrop :
+                        (_fit === 2 ? VideoOutput.Stretch : VideoOutput.PreserveAspectFit)
     }
 }

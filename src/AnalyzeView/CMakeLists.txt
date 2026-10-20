@@ -51,7 +51,7 @@ qt_add_qml_module(AnalyzeViewModule
 CPMAddPackage(
     NAME ulog_cpp
     GITHUB_REPOSITORY PX4/ulog_cpp
-    GIT_TAG main
+    GIT_TAG 4153a324d0c3fba73a4b9a375b3bed29e9a208a2 # main as of QGC v5.0.8 (2025-10-08)
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
