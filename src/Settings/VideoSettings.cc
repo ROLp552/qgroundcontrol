@@ -18,6 +18,7 @@
 #endif
 #ifndef QGC_DISABLE_UVC
 #include "UVCReceiver.h"
+#include <QtMultimedia/QMediaDevices>
 #endif
 
 DECLARE_SETTINGGROUP(Video, "Video")
@@ -25,6 +26,26 @@ DECLARE_SETTINGGROUP(Video, "Video")
     qmlRegisterUncreatableType<VideoSettings>("QGroundControl.SettingsManager", 1, 0, "VideoSettings", "Reference only");
 
     // Setup enum values for videoSource settings into meta data
+    _updateVideoSourceList();
+
+#ifndef QGC_DISABLE_UVC
+    // Local video devices (UVC, or the AX12 HDMI input exposed as an Android camera) may not be
+    // enumerated yet when QGC starts, so keep the device list up to date while the app runs.
+    _mediaDevices = new QMediaDevices(this);
+    (void) connect(_mediaDevices, &QMediaDevices::videoInputsChanged, this, &VideoSettings::_videoInputsChanged);
+
+    _videoInputsRetryTimer.setInterval(1000);
+    (void) connect(&_videoInputsRetryTimer, &QTimer::timeout, this, &VideoSettings::_videoInputsChanged);
+#endif
+
+    _setForceVideoDecodeList();
+
+    // Set default value for videoSource
+    _setDefaults();
+}
+
+void VideoSettings::_updateVideoSourceList()
+{
     QVariantList videoSourceList;
 #if defined(QGC_GST_STREAMING) || defined(QGC_QT_STREAMING)
     videoSourceList.append(videoSourceRTSP);
@@ -50,6 +71,7 @@ DECLARE_SETTINGGROUP(Video, "Video")
         videoSourceList.append(videoSourceNoVideo);
         setVisible(false);
     } else {
+        _noVideo = false;
         videoSourceList.insert(0, videoDisabled);
     }
 
@@ -59,12 +81,33 @@ DECLARE_SETTINGGROUP(Video, "Video")
         videoSourceCookedList.append( VideoSettings::tr(videoSource.toString().toStdString().c_str()) );
     }
 
-    _nameToMetaDataMap[videoSourceName]->setEnumInfo(videoSourceCookedList, videoSourceList);
+    if (_videoSourceFact) {
+        _videoSourceFact->setEnumInfo(videoSourceCookedList, videoSourceList);
+    } else {
+        _nameToMetaDataMap[videoSourceName]->setEnumInfo(videoSourceCookedList, videoSourceList);
+    }
+}
 
-    _setForceVideoDecodeList();
+void VideoSettings::_videoInputsChanged()
+{
+    _updateVideoSourceList();
 
-    // Set default value for videoSource
-    _setDefaults();
+    if (!_videoSourceFact) {
+        return;
+    }
+
+    const QVariant source = _videoSourceFact->rawValue();
+    if (_videoSourceFact->enumValues().contains(source.toString())) {
+        _videoInputsRetryTimer.stop();
+        if (_waitingForVideoInput) {
+            // The saved device showed up: let the video manager start it
+            _waitingForVideoInput = false;
+            emit _videoSourceFact->rawValueChanged(source);
+            emit _videoSourceFact->valueChanged(source);
+        }
+    } else if (_waitingForVideoInput && (++_videoInputsRetryCount >= _videoInputsMaxRetries)) {
+        _videoInputsRetryTimer.stop();
+    }
 }
 
 void VideoSettings::_setDefaults()
@@ -93,9 +136,20 @@ DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, videoSource)
     if (!_videoSourceFact) {
         _videoSourceFact = _createSettingsFact(videoSourceName);
         //-- Check for sources no longer available
-        if(!_videoSourceFact->enumValues().contains(_videoSourceFact->rawValue().toString())) {
+        const QString source = _videoSourceFact->rawValue().toString();
+        if(!_videoSourceFact->enumValues().contains(source)) {
             if (_noVideo) {
                 _videoSourceFact->setRawValue(videoSourceNoVideo);
+#ifndef QGC_DISABLE_UVC
+            } else if (!source.isEmpty() && !_isBuiltInVideoSource(source)) {
+                // Most likely a local video device that is not enumerated yet (e.g. the AX12 HDMI
+                // input right after boot). Keep the saved choice instead of overwriting it with
+                // "disabled", and keep looking for the device for a little while.
+                qCDebug(VideoManagerLog) << "Saved video device not available yet, waiting for it:" << source;
+                _waitingForVideoInput = true;
+                _videoInputsRetryCount = 0;
+                _videoInputsRetryTimer.start();
+#endif
             } else {
                 _videoSourceFact->setRawValue(videoDisabled);
             }
@@ -184,6 +238,16 @@ DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, tcpUrl)
         connect(_tcpUrlFact, &Fact::valueChanged, this, &VideoSettings::_configChanged);
     }
     return _tcpUrlFact;
+}
+
+bool VideoSettings::_isBuiltInVideoSource(const QString &source)
+{
+    static const QStringList builtInSources = {
+        videoSourceNoVideo, videoDisabled, videoSourceRTSP, videoSourceUDPH264, videoSourceUDPH265,
+        videoSourceTCP, videoSourceMPEGTS, videoSource3DRSolo, videoSourceParrotDiscovery,
+        videoSourceYuneecMantisG, videoSourceHerelinkAirUnit, videoSourceHerelinkHotspot
+    };
+    return builtInSources.contains(source);
 }
 
 bool VideoSettings::streamConfigured(void)

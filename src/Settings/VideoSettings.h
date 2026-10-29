@@ -11,6 +11,10 @@
 
 #include "SettingsGroup.h"
 
+#include <QtCore/QTimer>
+
+class QMediaDevices;
+
 class VideoSettings : public SettingsGroup
 {
     Q_OBJECT
@@ -72,12 +76,21 @@ signals:
 
 private slots:
     void _configChanged             (QVariant value);
+    void _videoInputsChanged        ();
 
 private:
     void _setDefaults               ();
     void _setForceVideoDecodeList();
+    void _updateVideoSourceList     ();
+    static bool _isBuiltInVideoSource(const QString &source);
 
 private:
     bool _noVideo = false;
+
+    QMediaDevices *_mediaDevices = nullptr;
+    QTimer _videoInputsRetryTimer;
+    int _videoInputsRetryCount = 0;
+    bool _waitingForVideoInput = false;
+    static constexpr int _videoInputsMaxRetries = 30;
 
 };
