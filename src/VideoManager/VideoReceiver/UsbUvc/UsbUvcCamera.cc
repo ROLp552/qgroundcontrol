@@ -31,6 +31,10 @@ QGC_LOGGING_CATEGORY(UsbUvcCameraLog, "qgc.videomanager.videoreceiver.usbuvc")
 Q_APPLICATION_STATIC(UsbUvcCamera, _usbUvcCameraInstance);
 
 static constexpr const char *kJniUvcCameraClassName = "org/mavlink/qgroundcontrol/QGCUvcCamera";
+static constexpr const char *kJniUvcRecorderClassName = "org/mavlink/qgroundcontrol/QGCUvcRecorder";
+// MediaCodecInfo.CodecCapabilities color formats
+static constexpr int kColorNV12 = 21;   // COLOR_FormatYUV420SemiPlanar
+static constexpr int kColorI420 = 19;   // COLOR_FormatYUV420Planar
 static constexpr jint kNoDevice = -1;
 static constexpr jint kWaitingForPermission = -2;
 static constexpr int kWatchdogMsecs = 3000;
@@ -375,6 +379,7 @@ bool UsbUvcCamera::_startStream(bool alternateFormat)
     }
 
     _frameSize = frameSize;
+    _streamFps = ctrl.dwFrameInterval ? static_cast<int>(10000000 / ctrl.dwFrameInterval) : 25;
     _framesInFlight = 0;
     resetUvcHookCounters();
     _framesReceived = 0;
@@ -426,6 +431,7 @@ void UsbUvcCamera::_checkStream()
 
 void UsbUvcCamera::_close()
 {
+    stopRecording();
     _debugTimer.stop();
     _watchdogTimer.stop();
     _streamGeneration++;
@@ -461,6 +467,11 @@ void UsbUvcCamera::_handleFrame(uvc_frame *frame)
     _lastFrameBytes = frame->data_bytes;
     _lastFrameWidth = frame->width;
     _lastFrameHeight = frame->height;
+
+    // Record every frame, before frames are dropped for a busy UI
+    if (_recActive.load() && (frame->frame_format == UVC_FRAME_FORMAT_YUYV)) {
+        _recordYuy2(frame);
+    }
 
     // Drop frames while the UI thread is still busy with the previous ones
     if (_framesInFlight.load() > 1) {
@@ -518,6 +529,9 @@ void UsbUvcCamera::_handleFrame(uvc_frame *frame)
             _framesFailed++;
             return;
         }
+        if (_recActive.load()) {
+            _recordImage(image);
+        }
         videoFrame = QVideoFrame(image);
     } else {
         _framesFailed++;
@@ -532,4 +546,166 @@ void UsbUvcCamera::_handleFrame(uvc_frame *frame)
             _framesShown++;
         }
     }, Qt::QueuedConnection);
+}
+
+bool UsbUvcCamera::startRecording(const QString &fileName)
+{
+    if (!_devh || !_frameSize.isValid()) {
+        emit recordingError(tr("USB video is not streaming"));
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(_recMutex);
+    if (_recActive.load()) {
+        return true;
+    }
+
+    const int width = _frameSize.width();
+    const int height = _frameSize.height();
+    const int rotation = SettingsManager::instance()->videoSettings()->usbUvcRotation()->rawValue().toInt();
+    const QJniObject jFileName = QJniObject::fromString(fileName);
+    const jint colorFormat = QJniObject::callStaticMethod<jint>(kJniUvcRecorderClassName, "start", "(Ljava/lang/String;IIII)I",
+                                                                jFileName.object<jstring>(), width, height, _streamFps, rotation);
+    if ((colorFormat != kColorNV12) && (colorFormat != kColorI420)) {
+        emit recordingError(tr("Could not start the H.264 encoder"));
+        return false;
+    }
+
+    const int size = (width * height * 3) / 2;
+    QJniEnvironment env;
+    jbyteArray array = env->NewByteArray(size);
+    if (!array) {
+        (void) env.checkAndClearExceptions();
+        QJniObject::callStaticMethod<void>(kJniUvcRecorderClassName, "stop", "()V");
+        emit recordingError(tr("Out of memory"));
+        return false;
+    }
+    _recArray = env->NewGlobalRef(array);
+    env->DeleteLocalRef(array);
+
+    _recBuffer.assign(size, 0);
+    _recSize = _frameSize;
+    _recColorFormat = colorFormat;
+    _recFileName = fileName;
+    _recActive = true;
+    qCDebug(UsbUvcCameraLog) << "Recording" << _recSize << "fps" << _streamFps << "color" << colorFormat << fileName;
+
+    emit recordingStateChanged(true, fileName);
+    return true;
+}
+
+void UsbUvcCamera::stopRecording()
+{
+    QString fileName;
+    {
+        std::lock_guard<std::mutex> lock(_recMutex);
+        if (!_recActive.load()) {
+            return;
+        }
+        _recActive = false;
+        QJniObject::callStaticMethod<void>(kJniUvcRecorderClassName, "stop", "()V");
+        if (_recArray) {
+            QJniEnvironment env;
+            env->DeleteGlobalRef(static_cast<jobject>(_recArray));
+            _recArray = nullptr;
+        }
+        fileName = _recFileName;
+    }
+    qCDebug(UsbUvcCameraLog) << "Recording stopped" << fileName;
+    emit recordingStateChanged(false, fileName);
+}
+
+void UsbUvcCamera::_recordYuy2(const uvc_frame *frame)
+{
+    std::lock_guard<std::mutex> lock(_recMutex);
+    const int width = static_cast<int>(frame->width);
+    const int height = static_cast<int>(frame->height);
+    const size_t srcStride = frame->step ? frame->step : static_cast<size_t>(width) * 2;
+    if (!_recActive.load() || (QSize(width, height) != _recSize) || (frame->data_bytes < (srcStride * height))) {
+        return;
+    }
+
+    // YUY2 (Y0 U Y1 V) -> NV12 (Y plane + interleaved UV) or I420 (Y, U, V planes), chroma from even rows
+    uint8_t *yPlane = _recBuffer.data();
+    uint8_t *uvPlane = yPlane + (width * height);
+    uint8_t *vPlane = uvPlane + ((width / 2) * (height / 2));
+    const bool nv12 = (_recColorFormat == kColorNV12);
+    const uchar *src = static_cast<const uchar*>(frame->data);
+    for (int y = 0; y < height; y++) {
+        const uchar *line = src + (y * srcStride);
+        uint8_t *yRow = yPlane + (y * width);
+        const bool chromaRow = ((y % 2) == 0);
+        for (int x = 0; (x + 1) < width; x += 2) {
+            const uchar *px = line + (x * 2);
+            yRow[x] = px[0];
+            yRow[x + 1] = px[2];
+            if (chromaRow) {
+                if (nv12) {
+                    uint8_t *uv = uvPlane + ((y / 2) * width) + x;
+                    uv[0] = px[1];
+                    uv[1] = px[3];
+                } else {
+                    const int ci = ((y / 2) * (width / 2)) + (x / 2);
+                    uvPlane[ci] = px[1];
+                    vPlane[ci] = px[3];
+                }
+            }
+        }
+    }
+    _encodeRecordBuffer();
+}
+
+void UsbUvcCamera::_recordImage(const QImage &decoded)
+{
+    std::lock_guard<std::mutex> lock(_recMutex);
+    if (!_recActive.load() || (decoded.size() != _recSize)) {
+        return;
+    }
+
+    const QImage image = decoded.convertToFormat(QImage::Format_RGB32);
+    const int width = image.width();
+    const int height = image.height();
+    uint8_t *yPlane = _recBuffer.data();
+    uint8_t *uvPlane = yPlane + (width * height);
+    uint8_t *vPlane = uvPlane + ((width / 2) * (height / 2));
+    const bool nv12 = (_recColorFormat == kColorNV12);
+    for (int y = 0; y < height; y++) {
+        const QRgb *line = reinterpret_cast<const QRgb*>(image.constScanLine(y));
+        uint8_t *yRow = yPlane + (y * width);
+        for (int x = 0; x < width; x++) {
+            const int r = qRed(line[x]);
+            const int g = qGreen(line[x]);
+            const int b = qBlue(line[x]);
+            // BT.601 limited range
+            yRow[x] = static_cast<uint8_t>(((66 * r + 129 * g + 25 * b + 128) >> 8) + 16);
+            if (((y % 2) == 0) && ((x % 2) == 0)) {
+                const uint8_t u = static_cast<uint8_t>(((-38 * r - 74 * g + 112 * b + 128) >> 8) + 128);
+                const uint8_t v = static_cast<uint8_t>(((112 * r - 94 * g - 18 * b + 128) >> 8) + 128);
+                if (nv12) {
+                    uint8_t *uv = uvPlane + ((y / 2) * width) + x;
+                    uv[0] = u;
+                    uv[1] = v;
+                } else {
+                    const int ci = ((y / 2) * (width / 2)) + (x / 2);
+                    uvPlane[ci] = u;
+                    vPlane[ci] = v;
+                }
+            }
+        }
+    }
+    _encodeRecordBuffer();
+}
+
+void UsbUvcCamera::_encodeRecordBuffer()
+{
+    // Called with _recMutex held, from the libuvc capture thread
+    if (!_recArray) {
+        return;
+    }
+    QJniEnvironment env;
+    const jsize size = static_cast<jsize>(_recBuffer.size());
+    jbyteArray array = static_cast<jbyteArray>(_recArray);
+    env->SetByteArrayRegion(array, 0, size, reinterpret_cast<const jbyte*>(_recBuffer.data()));
+    (void) QJniObject::callStaticMethod<jboolean>(kJniUvcRecorderClassName, "encode", "([BI)Z", array, size);
+    (void) env.checkAndClearExceptions();
 }

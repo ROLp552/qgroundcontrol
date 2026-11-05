@@ -101,6 +101,11 @@ void VideoManager::init(QQuickWindow *window)
         emit isUsbUvcChanged();
         emit hasVideoChanged();
     });
+#ifdef QGC_USB_UVC
+    // The direct USB capture records with Android's encoder, it reports like the UVC view's MediaRecorder
+    (void) connect(UsbUvcCamera::instance(), &UsbUvcCamera::recordingStateChanged, this, &VideoManager::uvcRecordingStateChanged);
+    (void) connect(UsbUvcCamera::instance(), &UsbUvcCamera::recordingError, this, &VideoManager::uvcRecordingError);
+#endif
     (void) connect(_videoSettings->udpUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
     (void) connect(_videoSettings->rtspUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
     (void) connect(_videoSettings->tcpUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
@@ -191,10 +196,14 @@ void VideoManager::startRecording(const QString &videoFile)
 
     const QString videoFileUrl = videoFile.isEmpty() ? QDateTime::currentDateTime().toString("yyyy-MM-dd_hh.mm.ss") : videoFile;
 
+#ifdef QGC_USB_UVC
     if (isUsbUvc()) {
-        qgcApp()->showAppMessage(tr("Recording the direct USB video capture is not supported yet."));
+        const QString usbFileName = savePath + "/" + videoFileUrl + ".mp4";
+        qCDebug(VideoManagerLog) << "Requesting USB capture recording to" << usbFileName;
+        (void) UsbUvcCamera::instance()->startRecording(usbFileName);
         return;
     }
+#endif
 
     if (isUvc()) {
         // Local video devices are not handled by the video receivers, they are recorded by the
@@ -222,6 +231,12 @@ void VideoManager::startRecording(const QString &videoFile)
 
 void VideoManager::stopRecording()
 {
+#ifdef QGC_USB_UVC
+    if (UsbUvcCamera::instance()->recording()) {
+        UsbUvcCamera::instance()->stopRecording();
+        return;
+    }
+#endif
     if (isUvc() || _uvcRecording) {
         emit uvcStopRecordingRequested();
     }

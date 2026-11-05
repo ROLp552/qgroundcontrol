@@ -16,10 +16,13 @@
 #include <QtCore/QTimer>
 
 #include <atomic>
+#include <mutex>
+#include <vector>
 #include <thread>
 
 Q_DECLARE_LOGGING_CATEGORY(UsbUvcCameraLog)
 
+class QImage;
 class QVideoSink;
 struct libusb_context;
 struct uvc_context;
@@ -49,6 +52,11 @@ public:
     Q_INVOKABLE void start(QObject *videoSink);
     Q_INVOKABLE void stop();
 
+    /// Record the USB video to an MP4 file with Android's hardware H.264 encoder
+    bool startRecording(const QString &fileName);
+    void stopRecording();
+    bool recording() const { return _recActive.load(); }
+
     bool streaming() const { return _devh != nullptr; }
     QString status() const { return _status; }
     QString debugInfo() const { return _debugInfo; }
@@ -60,6 +68,8 @@ signals:
     void statusChanged();
     void debugInfoChanged();
     void cpuConvertChanged();
+    void recordingStateChanged(bool active, const QString &fileName);
+    void recordingError(const QString &errorString);
 
 private slots:
     void _deviceChanged();
@@ -73,6 +83,9 @@ private:
     void _setStatus(const QString &status);
     void _handleFrame(uvc_frame *frame);
     static void _frameCallback(uvc_frame *frame, void *userPtr);
+    void _recordYuy2(const uvc_frame *frame);
+    void _recordImage(const QImage &image);
+    void _encodeRecordBuffer();
 
     void _eventLoop();
 
@@ -87,6 +100,16 @@ private:
     bool _wantStreaming = false;
     QString _status;
     QSize _frameSize;
+    int _streamFps = 25;
+
+    // Recording, _recMutex serializes the capture thread (encode) with start/stop
+    std::mutex _recMutex;
+    std::atomic<bool> _recActive = false;
+    QString _recFileName;
+    QSize _recSize;
+    int _recColorFormat = 0;
+    void *_recArray = nullptr;  // global ref to the Java byte[] frame buffer
+    std::vector<uint8_t> _recBuffer;
     std::atomic<int> _framesInFlight = 0;
 
     std::atomic<bool> _cpuConvert = false;
