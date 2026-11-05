@@ -26,9 +26,13 @@
 #endif
 #include "QtMultimediaReceiver.h"
 #include "UVCReceiver.h"
+#ifdef QGC_USB_UVC
+#include "UsbUvcCamera.h"
+#endif
 
 #include <QtCore/qapplicationstatic.h>
 #include <QtCore/QDir>
+#include <QtCore/QUrl>
 #include <QtQml/QQmlEngine>
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
@@ -92,6 +96,11 @@ void VideoManager::init(QQuickWindow *window)
 
     // TODO: VideoSettings _configChanged/streamConfiguredChanged
     (void) connect(_videoSettings->videoSource(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
+    // The direct USB capture doesn't change any receiver URI, so _videoSourceChanged doesn't report it
+    (void) connect(_videoSettings->videoSource(), &Fact::rawValueChanged, this, [this]() {
+        emit isUsbUvcChanged();
+        emit hasVideoChanged();
+    });
     (void) connect(_videoSettings->udpUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
     (void) connect(_videoSettings->rtspUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
     (void) connect(_videoSettings->tcpUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
@@ -181,6 +190,21 @@ void VideoManager::startRecording(const QString &videoFile)
     }
 
     const QString videoFileUrl = videoFile.isEmpty() ? QDateTime::currentDateTime().toString("yyyy-MM-dd_hh.mm.ss") : videoFile;
+
+    if (isUsbUvc()) {
+        qgcApp()->showAppMessage(tr("Recording the direct USB video capture is not supported yet."));
+        return;
+    }
+
+    if (isUvc()) {
+        // Local video devices are not handled by the video receivers, they are recorded by the
+        // MediaRecorder in FlightDisplayViewUVC.qml. Android records MP4 (H.264) reliably.
+        const QString uvcFileName = savePath + "/" + videoFileUrl + ".mp4";
+        qCDebug(VideoManagerLog) << "Requesting UVC recording to" << uvcFileName;
+        emit uvcStartRecordingRequested(QUrl::fromLocalFile(uvcFileName).toString());
+        return;
+    }
+
     const QString ext = kFileExtension[fileFormat];
 
     const QString videoFileNameTemplate = savePath + "/" + videoFileUrl + ".%1" + ext;
@@ -198,9 +222,34 @@ void VideoManager::startRecording(const QString &videoFile)
 
 void VideoManager::stopRecording()
 {
+    if (isUvc() || _uvcRecording) {
+        emit uvcStopRecordingRequested();
+    }
+
     for (VideoReceiver *receiver : std::as_const(_videoReceivers)) {
         receiver->stopRecording();
     }
+}
+
+void VideoManager::uvcRecordingStateChanged(bool active, const QString &fileName)
+{
+    qCDebug(VideoManagerLog) << "UVC recording changed, active:" << (active ? "yes" : "no") << fileName;
+    if (_uvcRecording == active) {
+        return;
+    }
+
+    _uvcRecording = active;
+    _recording = active;
+    emit recordingChanged();
+    if (active) {
+        emit recordingStarted(fileName);
+    }
+}
+
+void VideoManager::uvcRecordingError(const QString &errorString)
+{
+    qCWarning(VideoManagerLog) << "UVC recording error:" << errorString;
+    qgcApp()->showAppMessage(tr("Video recording failed: %1").arg(errorString));
 }
 
 void VideoManager::grabImage(const QString &imageFile)
@@ -297,6 +346,24 @@ bool VideoManager::gstreamerEnabled()
     return true;
 #else
     return false;
+#endif
+}
+
+bool VideoManager::isUsbUvc() const
+{
+#ifdef QGC_USB_UVC
+    return hasVideo() && (_videoSettings->videoSource()->rawValue().toString() == VideoSettings::videoSourceUsbUvc);
+#else
+    return false;
+#endif
+}
+
+QObject *VideoManager::usbUvcCamera() const
+{
+#ifdef QGC_USB_UVC
+    return UsbUvcCamera::instance();
+#else
+    return nullptr;
 #endif
 }
 
@@ -532,7 +599,7 @@ bool VideoManager::_updateSettings(VideoReceiver *receiver)
         settingsChanged |= _updateVideoUri(receiver, QStringLiteral("rtsp://192.168.0.10:8554/H264Video"));
     } else if (source == VideoSettings::videoSourceHerelinkHotspot) {
         settingsChanged |= _updateVideoUri(receiver, QStringLiteral("rtsp://192.168.43.1:8554/fpv_stream"));
-    } else if ((source == VideoSettings::videoDisabled) || (source == VideoSettings::videoSourceNoVideo)) {
+    } else if ((source == VideoSettings::videoDisabled) || (source == VideoSettings::videoSourceNoVideo) || (source == VideoSettings::videoSourceUsbUvc)) {
         settingsChanged |= _updateVideoUri(receiver, QString());
     } else {
         settingsChanged |= _updateVideoUri(receiver, QString());

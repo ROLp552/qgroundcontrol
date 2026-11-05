@@ -26,6 +26,7 @@ SettingsPage {
     property bool   _isGST:                     _videoManager.gstreamerEnabled
     property bool   _isStreamSource:            _videoManager.isStreamSource
     property bool   _isUvc:                     _videoManager.isUvc
+    property bool   _isUsbUvc:                  _videoManager.isUsbUvc
     property bool   _isUDP264:                  _isStreamSource && (_videoSource === _videoSettings.udp264VideoSource)
     property bool   _isUDP265:                  _isStreamSource && (_videoSource === _videoSettings.udp265VideoSource)
     property bool   _isRTSP:                    _isStreamSource && (_videoSource === _videoSettings.rtspVideoSource)
@@ -96,17 +97,32 @@ SettingsPage {
         LabelledFactComboBox {
             Layout.fillWidth:   true
             label:              qsTr("Rotation")
-            fact:               _videoSettings.uvcRotation
+            fact:               _isUsbUvc ? _videoSettings.usbUvcRotation : _videoSettings.uvcRotation
             indexModel:         false
-            visible:            _isUvc && fact.visible
+            visible:            (_isUvc || _isUsbUvc) && fact.visible
+        }
+
+        LabelledFactComboBox {
+            Layout.fillWidth:   true
+            label:              qsTr("USB Capture Format")
+            fact:               _videoSettings.usbUvcFormat
+            indexModel:         false
+            visible:            _isUsbUvc && fact.visible
+        }
+
+        FactCheckBoxSlider {
+            Layout.fillWidth:   true
+            text:               qsTr("Show USB capture diagnostics")
+            fact:               _videoSettings.usbUvcDiagnostics
+            visible:            _isUsbUvc && fact.visible
         }
 
         LabelledFactComboBox {
             Layout.fillWidth:   true
             label:              qsTr("Video Fit")
-            fact:               _videoSettings.uvcFit
+            fact:               _isUsbUvc ? _videoSettings.usbUvcFit : _videoSettings.uvcFit
             indexModel:         false
-            visible:            _isUvc && fact.visible
+            visible:            (_isUvc || _isUsbUvc) && fact.visible
         }
 
         FactCheckBoxSlider {

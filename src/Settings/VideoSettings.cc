@@ -66,6 +66,9 @@ void VideoSettings::_updateVideoSourceList()
 #ifndef QGC_DISABLE_UVC
     videoSourceList.append(UVCReceiver::getDeviceNameList());
 #endif
+#ifdef QGC_USB_UVC
+    videoSourceList.append(videoSourceUsbUvc);
+#endif
     if (videoSourceList.count() == 0) {
         _noVideo = true;
         videoSourceList.append(videoSourceNoVideo);
@@ -123,6 +126,10 @@ DECLARE_SETTINGSFACT(VideoSettings, aspectRatio)
 DECLARE_SETTINGSFACT(VideoSettings, videoFit)
 DECLARE_SETTINGSFACT(VideoSettings, uvcRotation)
 DECLARE_SETTINGSFACT(VideoSettings, uvcFit)
+DECLARE_SETTINGSFACT(VideoSettings, usbUvcRotation)
+DECLARE_SETTINGSFACT(VideoSettings, usbUvcFit)
+DECLARE_SETTINGSFACT(VideoSettings, usbUvcFormat)
+DECLARE_SETTINGSFACT(VideoSettings, usbUvcDiagnostics)
 DECLARE_SETTINGSFACT(VideoSettings, gridLines)
 DECLARE_SETTINGSFACT(VideoSettings, showRecControl)
 DECLARE_SETTINGSFACT(VideoSettings, recordingFormat)
@@ -245,7 +252,7 @@ bool VideoSettings::_isBuiltInVideoSource(const QString &source)
     static const QStringList builtInSources = {
         videoSourceNoVideo, videoDisabled, videoSourceRTSP, videoSourceUDPH264, videoSourceUDPH265,
         videoSourceTCP, videoSourceMPEGTS, videoSource3DRSolo, videoSourceParrotDiscovery,
-        videoSourceYuneecMantisG, videoSourceHerelinkAirUnit, videoSourceHerelinkHotspot
+        videoSourceYuneecMantisG, videoSourceHerelinkAirUnit, videoSourceHerelinkHotspot, videoSourceUsbUvc
     };
     return builtInSources.contains(source);
 }
@@ -292,6 +299,12 @@ bool VideoSettings::streamConfigured(void)
         qCDebug(VideoManagerLog) << "Stream configured for Herelink Hotspot";
         return true;
     }
+#ifdef QGC_USB_UVC
+    if (vSource == videoSourceUsbUvc) {
+        qCDebug(VideoManagerLog) << "Stream configured for direct USB video capture";
+        return true;
+    }
+#endif
 #ifndef QGC_DISABLE_UVC
     if (UVCReceiver::enabled() && UVCReceiver::deviceExists(vSource)) {
         qCDebug(VideoManagerLog) << "Stream configured for UVC";

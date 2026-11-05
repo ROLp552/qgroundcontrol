@@ -31,6 +31,10 @@ public:
     DEFINE_SETTINGFACT(videoFit)
     DEFINE_SETTINGFACT(uvcRotation)
     DEFINE_SETTINGFACT(uvcFit)
+    DEFINE_SETTINGFACT(usbUvcRotation)
+    DEFINE_SETTINGFACT(usbUvcFit)
+    DEFINE_SETTINGFACT(usbUvcFormat)
+    DEFINE_SETTINGFACT(usbUvcDiagnostics)
     DEFINE_SETTINGFACT(gridLines)
     DEFINE_SETTINGFACT(showRecControl)
     DEFINE_SETTINGFACT(recordingFormat)
@@ -49,6 +53,7 @@ public:
     Q_PROPERTY(QString  tcpVideoSource          READ tcpVideoSource         CONSTANT)
     Q_PROPERTY(QString  mpegtsVideoSource       READ mpegtsVideoSource      CONSTANT)
     Q_PROPERTY(QString  disabledVideoSource     READ disabledVideoSource    CONSTANT)
+    Q_PROPERTY(QString  usbUvcVideoSource       READ usbUvcVideoSource      CONSTANT)
 
     bool     streamConfigured       ();
     QString  rtspVideoSource        () { return videoSourceRTSP; }
@@ -57,6 +62,7 @@ public:
     QString  tcpVideoSource         () { return videoSourceTCP; }
     QString  mpegtsVideoSource      () { return videoSourceMPEGTS; }
     QString  disabledVideoSource    () { return videoDisabled; }
+    QString  usbUvcVideoSource      () { return videoSourceUsbUvc; }
 
     static constexpr const char* videoSourceNoVideo           = QT_TRANSLATE_NOOP("VideoSettings", "No Video Available");
     static constexpr const char* videoDisabled                = QT_TRANSLATE_NOOP("VideoSettings", "Video Stream Disabled");
@@ -70,6 +76,7 @@ public:
     static constexpr const char* videoSourceYuneecMantisG     = QT_TRANSLATE_NOOP("VideoSettings", "Yuneec Mantis G");
     static constexpr const char* videoSourceHerelinkAirUnit   = QT_TRANSLATE_NOOP("VideoSettings", "Herelink AirUnit");
     static constexpr const char* videoSourceHerelinkHotspot   = QT_TRANSLATE_NOOP("VideoSettings", "Herelink Hotspot");
+    static constexpr const char* videoSourceUsbUvc            = QT_TRANSLATE_NOOP("VideoSettings", "USB Video Capture (direct)");
 
 signals:
     void streamConfiguredChanged    (bool configured);

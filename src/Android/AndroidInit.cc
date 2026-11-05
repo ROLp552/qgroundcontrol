@@ -4,6 +4,9 @@
     #include "AndroidSerial.h"
 #endif
 #include "JoystickAndroid.h"
+#ifdef QGC_USB_UVC
+    #include "UsbUvcCamera.h"
+#endif
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/QJniEnvironment>
@@ -111,6 +114,10 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved)
     #endif
 
     JoystickAndroid::setNativeMethods();
+
+    #ifdef QGC_USB_UVC
+        UsbUvcCamera::setNativeMethods();
+    #endif
 
     QNativeInterface::QAndroidApplication::hideSplashScreen(333);
 

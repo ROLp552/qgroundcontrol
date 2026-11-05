@@ -81,6 +81,40 @@
     "default":          0
 },
 {
+    "name":             "usbUvcRotation",
+    "shortDesc":        "USB Video Capture Rotation",
+    "longDesc":         "Rotate the direct USB video capture (UVC grabber read without Android's camera API) image by the selected amount.",
+    "type":             "uint32",
+    "enumStrings":      "0°,90°,180°,270°",
+    "enumValues":       "0,90,180,270",
+    "default":          0
+},
+{
+    "name":             "usbUvcFormat",
+    "shortDesc":        "USB Video Capture Format",
+    "longDesc":         "Video format requested from the direct USB video capture device. Auto prefers uncompressed YUY2 and falls back to MJPEG. MJPEG needs much less USB bandwidth.",
+    "type":             "uint32",
+    "enumStrings":      "Auto,YUY2,MJPEG",
+    "enumValues":       "0,1,2",
+    "default":          0
+},
+{
+    "name":             "usbUvcDiagnostics",
+    "shortDesc":        "Show USB Video Capture Diagnostics",
+    "longDesc":         "Show frame and USB transfer counters over the direct USB video capture, to troubleshoot devices that show no video.",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "usbUvcFit",
+    "shortDesc":        "USB Video Capture Fit",
+    "longDesc":         "How the direct USB video capture image is scaled to the display. Fit shows the whole image, Fill crops to fill the screen, Stretch ignores the aspect ratio.",
+    "type":             "uint32",
+    "enumStrings":      "Fit,Fill,Stretch",
+    "enumValues":       "0,1,2",
+    "default":          0
+},
+{
     "name":             "showRecControl",
     "shortDesc": "Show Video Record Control",
     "longDesc":  "Show recording control in the UI.",

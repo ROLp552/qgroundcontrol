@@ -64,8 +64,8 @@ Item {
     Loader {
         id:             cameraLoader
         anchors.fill:   parent
-        visible:        QGroundControl.videoManager.isUvc
-        source:         QGroundControl.videoManager.uvcEnabled ? "qrc:/qml/QGroundControl/FlightDisplay/FlightDisplayViewUVC.qml" : "qrc:/qml/QGroundControl/FlightDisplay//FlightDisplayViewDummy.qml"
+        visible:        QGroundControl.videoManager.isUvc || QGroundControl.videoManager.isUsbUvc
+        source:         (QGroundControl.videoManager.uvcEnabled || QGroundControl.videoManager.usbUvcCamera) ? "qrc:/qml/QGroundControl/FlightDisplay/FlightDisplayViewUVC.qml" : "qrc:/qml/QGroundControl/FlightDisplay//FlightDisplayViewDummy.qml"
     }
 
     QGCLabel {

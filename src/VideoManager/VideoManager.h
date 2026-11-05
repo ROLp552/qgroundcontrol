@@ -40,6 +40,8 @@ class VideoManager : public QObject
     Q_PROPERTY(bool     hasVideo                READ hasVideo                                   NOTIFY hasVideoChanged)
     Q_PROPERTY(bool     isStreamSource          READ isStreamSource                             NOTIFY isStreamSourceChanged)
     Q_PROPERTY(bool     isUvc                   READ isUvc                                      NOTIFY isUvcChanged)
+    Q_PROPERTY(bool     isUsbUvc                READ isUsbUvc                                   NOTIFY isUsbUvcChanged)
+    Q_PROPERTY(QObject* usbUvcCamera            READ usbUvcCamera                               CONSTANT)
     Q_PROPERTY(bool     recording               READ recording                                  NOTIFY recordingChanged)
     Q_PROPERTY(bool     streaming               READ streaming                                  NOTIFY streamingChanged)
     Q_PROPERTY(double   aspectRatio             READ aspectRatio                                NOTIFY aspectRatioChanged)
@@ -62,6 +64,9 @@ public:
     Q_INVOKABLE void startVideo();
     Q_INVOKABLE void stopRecording();
     Q_INVOKABLE void stopVideo();
+    /// Called by the UVC video view (QtMultimedia MediaRecorder) to report recording state/errors
+    Q_INVOKABLE void uvcRecordingStateChanged(bool active, const QString &fileName);
+    Q_INVOKABLE void uvcRecordingError(const QString &errorString);
 
     void init(QQuickWindow *rootWindow);
     void cleanup();
@@ -72,6 +77,9 @@ public:
     bool hasVideo() const;
     bool isStreamSource() const;
     bool isUvc() const;
+    /// Direct USB video capture (libuvc), for UVC devices Android's camera API does not expose
+    bool isUsbUvc() const;
+    QObject *usbUvcCamera() const;
     bool recording() const { return _recording; }
     bool streaming() const { return _streaming; }
     double aspectRatio() const;
@@ -96,10 +104,14 @@ signals:
     void isAutoStreamChanged();
     void isStreamSourceChanged();
     void isUvcChanged();
+    void isUsbUvcChanged();
     void recordingChanged();
     void recordingStarted(const QString &filename);
     void streamingChanged();
     void uvcVideoSourceIDChanged();
+    /// UVC video is shown and recorded in QML, these ask the UVC video view to start/stop recording
+    void uvcStartRecordingRequested(const QString &fileUrl);
+    void uvcStopRecordingRequested();
     void videoSizeChanged();
 
 private slots:
@@ -128,6 +140,7 @@ private:
     bool _fullScreen = false;
     QAtomicInteger<bool> _decoding = false;
     QAtomicInteger<bool> _recording = false;
+    bool _uvcRecording = false;
     QAtomicInteger<bool> _streaming = false;
     QSize _videoSize;
     QString _imageFile;
