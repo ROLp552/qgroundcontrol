@@ -50,7 +50,10 @@ Rectangle {
             _usbUvcCamera.start(videoOutput.videoSink)
         }
     }
-    Component.onCompleted:  _updateUsbUvc()
+    Component.onCompleted: {
+        _videoManager.setUvcVideoSink(videoOutput.videoSink)
+        _updateUsbUvc()
+    }
 
     MediaDevices {
         id: mediaDevices

@@ -15,6 +15,8 @@
 #include <QtCore/QSize>
 #include <QtCore/QTimer>
 
+#include "AndroidVideoRecorder.h"
+
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -55,7 +57,7 @@ public:
     /// Record the USB video to an MP4 file with Android's hardware H.264 encoder
     bool startRecording(const QString &fileName);
     void stopRecording();
-    bool recording() const { return _recActive.load(); }
+    bool recording() const { return _recorder.active(); }
 
     bool streaming() const { return _devh != nullptr; }
     QString status() const { return _status; }
@@ -83,9 +85,6 @@ private:
     void _setStatus(const QString &status);
     void _handleFrame(uvc_frame *frame);
     static void _frameCallback(uvc_frame *frame, void *userPtr);
-    void _recordYuy2(const uvc_frame *frame);
-    void _recordImage(const QImage &image);
-    void _encodeRecordBuffer();
 
     void _eventLoop();
 
@@ -102,14 +101,7 @@ private:
     QSize _frameSize;
     int _streamFps = 25;
 
-    // Recording, _recMutex serializes the capture thread (encode) with start/stop
-    std::mutex _recMutex;
-    std::atomic<bool> _recActive = false;
-    QString _recFileName;
-    QSize _recSize;
-    int _recColorFormat = 0;
-    void *_recArray = nullptr;  // global ref to the Java byte[] frame buffer
-    std::vector<uint8_t> _recBuffer;
+    AndroidVideoRecorder _recorder;
     std::atomic<int> _framesInFlight = 0;
 
     std::atomic<bool> _cpuConvert = false;

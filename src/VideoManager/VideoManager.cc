@@ -27,12 +27,15 @@
 #include "QtMultimediaReceiver.h"
 #include "UVCReceiver.h"
 #ifdef QGC_USB_UVC
+#include "AndroidVideoRecorder.h"
 #include "UsbUvcCamera.h"
 #endif
 
 #include <QtCore/qapplicationstatic.h>
 #include <QtCore/QDir>
 #include <QtCore/QUrl>
+#include <QtMultimedia/QVideoFrame>
+#include <QtMultimedia/QVideoSink>
 #include <QtQml/QQmlEngine>
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
@@ -61,6 +64,16 @@ VideoManager::VideoManager(QObject *parent)
     if (!GStreamer::initialize()) {
         qCCritical(VideoManagerLog) << "Failed To Initialize GStreamer";
     }
+#endif
+
+#ifdef QGC_USB_UVC
+    // Created here, not in init(): the UVC view hands over its video sink before init() runs
+    _uvcRecorder = new AndroidVideoRecorder(this);
+    // Queued: emitted from the frame thread with the recorder lock held
+    (void) connect(_uvcRecorder, &AndroidVideoRecorder::errorOccurred, this, [this](const QString &errorString) {
+        uvcRecordingError(errorString);
+        uvcRecordingStateChanged(false, _uvcRecorder->fileName());
+    }, Qt::QueuedConnection);
 #endif
 }
 
@@ -206,11 +219,21 @@ void VideoManager::startRecording(const QString &videoFile)
 #endif
 
     if (isUvc()) {
-        // Local video devices are not handled by the video receivers, they are recorded by the
-        // MediaRecorder in FlightDisplayViewUVC.qml. Android records MP4 (H.264) reliably.
+        // Local video devices are not handled by the video receivers
         const QString uvcFileName = savePath + "/" + videoFileUrl + ".mp4";
+#ifdef QGC_USB_UVC
+        // Recorded from the frames of the UVC view's video sink with Android's H.264 encoder
+        qCDebug(VideoManagerLog) << "Recording local video device to" << uvcFileName;
+        if (!_uvcRecorder) {
+            return;
+        }
+        _uvcRecorder->start(uvcFileName, 30, _videoSettings->uvcRotation()->rawValue().toInt());
+        uvcRecordingStateChanged(true, uvcFileName);
+#else
+        // Recorded by the MediaRecorder in FlightDisplayViewUVC.qml
         qCDebug(VideoManagerLog) << "Requesting UVC recording to" << uvcFileName;
         emit uvcStartRecordingRequested(QUrl::fromLocalFile(uvcFileName).toString());
+#endif
         return;
     }
 
@@ -236,6 +259,12 @@ void VideoManager::stopRecording()
         UsbUvcCamera::instance()->stopRecording();
         return;
     }
+    if (_uvcRecorder && _uvcRecorder->active()) {
+        const QString fileName = _uvcRecorder->fileName();
+        _uvcRecorder->stop();
+        uvcRecordingStateChanged(false, fileName);
+        return;
+    }
 #endif
     if (isUvc() || _uvcRecording) {
         emit uvcStopRecordingRequested();
@@ -259,6 +288,28 @@ void VideoManager::uvcRecordingStateChanged(bool active, const QString &fileName
     if (active) {
         emit recordingStarted(fileName);
     }
+}
+
+void VideoManager::setUvcVideoSink(QObject *videoSink)
+{
+#ifdef QGC_USB_UVC
+    QVideoSink *const sink = qobject_cast<QVideoSink*>(videoSink);
+    if (!sink || (sink == _uvcVideoSink)) {
+        return;
+    }
+    if (_uvcVideoSink) {
+        (void) disconnect(_uvcVideoSink, nullptr, this, nullptr);
+    }
+    _uvcVideoSink = sink;
+    // Direct: frames are recorded in the thread that delivers them
+    (void) connect(sink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame &frame) {
+        if (_uvcRecorder && _uvcRecorder->active()) {
+            _uvcRecorder->recordVideoFrame(frame);
+        }
+    }, Qt::DirectConnection);
+#else
+    Q_UNUSED(videoSink);
+#endif
 }
 
 void VideoManager::uvcRecordingError(const QString &errorString)

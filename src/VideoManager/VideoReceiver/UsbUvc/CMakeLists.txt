@@ -98,6 +98,8 @@ target_link_libraries(qgc_libuvc PUBLIC qgc_libusb)
 
 target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE
+        AndroidVideoRecorder.cc
+        AndroidVideoRecorder.h
         UsbUvcCamera.cc
         UsbUvcCamera.h
 )

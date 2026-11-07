@@ -11,6 +11,7 @@
 
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
+#include <QtCore/QPointer>
 #include <QtCore/QRunnable>
 #include <QtCore/QSize>
 // #include <QtQmlIntegration/QtQmlIntegration>
@@ -21,6 +22,7 @@ class QQuickWindow;
 class FinishVideoInitialization;
 class SubtitleWriter;
 class Vehicle;
+class AndroidVideoRecorder;
 class VideoReceiver;
 class VideoSettings;
 
@@ -67,6 +69,8 @@ public:
     /// Called by the UVC video view (QtMultimedia MediaRecorder) to report recording state/errors
     Q_INVOKABLE void uvcRecordingStateChanged(bool active, const QString &fileName);
     Q_INVOKABLE void uvcRecordingError(const QString &errorString);
+    /// The UVC view's VideoOutput.videoSink, local video devices are recorded from its frames on Android
+    Q_INVOKABLE void setUvcVideoSink(QObject *videoSink);
 
     void init(QQuickWindow *rootWindow);
     void cleanup();
@@ -141,6 +145,10 @@ private:
     QAtomicInteger<bool> _decoding = false;
     QAtomicInteger<bool> _recording = false;
     bool _uvcRecording = false;
+    QPointer<QObject> _uvcVideoSink;
+    // Android: Qt's FFmpeg MediaRecorder can't open a video encoder on some devices (RadioMaster AX12),
+    // so local video devices are recorded with Android's H.264 encoder instead
+    AndroidVideoRecorder *_uvcRecorder = nullptr;
     QAtomicInteger<bool> _streaming = false;
     QSize _videoSize;
     QString _imageFile;

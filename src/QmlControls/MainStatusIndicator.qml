@@ -175,7 +175,10 @@ RowLayout {
 
         ToolIndicatorPage {
             showExpand:         _activeVehicle.mainStatusIndicatorContentItem ? true : false
-            waitForParameters:  _activeVehicle.mainStatusIndicatorContentItem ? true : false
+            // Messages, arming and sensor status don't need parameters, only the firmware specific
+            // expanded content does (e.g. ArduPilot GCS failsafe settings). On slow links the
+            // parameter download can take minutes and the messages are needed right away.
+            waitForParameters:  false
             contentComponent:   mainStatusContentComponent
             expandedComponent:  mainStatusExpandedComponent
         }
@@ -343,8 +346,13 @@ RowLayout {
 
             property real margins: ScreenTools.defaultFontPixelHeight
 
+            QGCLabel {
+                text:       qsTr("Waiting for parameters...")
+                visible:    !QGroundControl.multiVehicleManager.parameterReadyVehicleAvailable
+            }
+
             Loader {
-                source: _activeVehicle.mainStatusIndicatorContentItem
+                source: QGroundControl.multiVehicleManager.parameterReadyVehicleAvailable ? _activeVehicle.mainStatusIndicatorContentItem : ""
             }
 
             SettingsGroupLayout {
