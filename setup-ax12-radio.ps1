@@ -24,7 +24,9 @@ param(
     [string]$Adb = 'C:\Android\Sdk\platform-tools\adb.exe'
 )
 
-$ErrorActionPreference = 'Stop'
+# 'Continue': adb writes notices (e.g. "daemon not running; starting now") to stderr, which
+# PowerShell 5.1 turns into terminating errors under 'Stop'. Real failures are checked explicitly.
+$ErrorActionPreference = 'Continue'
 
 $Download    = '/storage/emulated/0/Download'
 $BlockName   = '0x00230226a.sfw'
@@ -32,6 +34,9 @@ $QgcPackage  = 'org.mavlink.qgroundcontrol'
 
 if (-not (Test-Path $Adb)) { throw "adb not found: $Adb" }
 if (-not $SkipInstall -and -not (Test-Path $Apk)) { throw "APK not found: $Apk (use -Apk or -SkipInstall)" }
+
+# Start the adb server up front so its startup notice doesn't mix with the device list
+& $Adb start-server 2>&1 | Out-Null
 
 function Invoke-AdbShell([string]$serial, [string]$command) {
     # adb prints warnings on stderr that PowerShell 5.1 turns into errors, keep stdout only
