@@ -55,7 +55,13 @@ public class QGCUvcRecorder {
 
             final MediaFormat format = MediaFormat.createVideoFormat(MIME, width, height);
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat);
-            format.setInteger(MediaFormat.KEY_BIT_RATE, Math.max(2000000, width * height * 8));
+            // ~3 bits per pixel per second, 2..8 Mbit/s: 720x576 ~2 Mbit/s, 1080p ~6 Mbit/s
+            format.setInteger(MediaFormat.KEY_BIT_RATE, Math.min(8000000, Math.max(2000000, width * height * 3)));
+            final MediaCodecInfo.EncoderCapabilities encoderCaps = codec.getCodecInfo().getCapabilitiesForType(MIME).getEncoderCapabilities();
+            if ((encoderCaps != null) && encoderCaps.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)) {
+                // Variable bitrate overshoots a lot on some encoders (MediaTek)
+                format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR);
+            }
             format.setInteger(MediaFormat.KEY_FRAME_RATE, (fps > 0) ? fps : 25);
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
             codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);

@@ -237,8 +237,10 @@ void AndroidVideoRecorder::recordVideoFrame(const QVideoFrame &source)
             recordYuy2(frame.bits(0), stride * height, width, height, stride);
         } else {
             std::lock_guard<std::mutex> lock(_mutex);
-            // The camera frame's own rotation is added to the orientation hint (the view applies it too)
-            if (_prepare(QSize(width, height), static_cast<int>(source.rotation()))) {
+            // Like the video view, add up the stream's rotation (e.g. Android camera sensor orientation,
+            // kept in the surface format) and the frame's own rotation
+            const int frameRotation = static_cast<int>(source.surfaceFormat().rotation()) + static_cast<int>(source.rotation());
+            if (_prepare(QSize(width, height), frameRotation)) {
                 const uchar *y = frame.bits(0);
                 const int yStride = frame.bytesPerLine(0);
                 const uchar *p1 = frame.bits(1);
