@@ -16,6 +16,7 @@
 #   powershell -ExecutionPolicy Bypass -File .\setup-ax12-radio.ps1 -Once             # one radio, then exit
 #
 # Note: every AX12 reports the same adb serial (0123456789ABCDEF), so connect one radio at a time.
+# Radios are told apart by their Android ID: a radio that was just prepared is not processed again.
 
 param(
     [string]$Apk = 'C:\qgc-build\APK\QGroundControl-AX12-v9-rec-tuning.apk',
@@ -118,10 +119,19 @@ function Protect-RadioMasterApp([string]$serial) {
 }
 
 $done = 0
+$lastRadioId = $null
 while ($true) {
     $serial = Wait-Radio
+    # Every AX12 has the same adb serial, tell radios apart by their Android ID
+    $radioId = Invoke-AdbShell $serial 'settings get secure android_id'
+    if ($radioId -and ($radioId -eq $lastRadioId)) {
+        Write-Host 'This is the radio that was just prepared, connect the next one...' -ForegroundColor Yellow
+        Start-Sleep -Seconds 3
+        continue
+    }
+    $lastRadioId = $radioId
     $model = Invoke-AdbShell $serial 'getprop ro.product.model'
-    Write-Host "`n=== Radio $serial ($model) ===" -ForegroundColor Cyan
+    Write-Host "`n=== Radio $radioId ($model) ===" -ForegroundColor Cyan
     if ($model -ne 'AX12') {
         Write-Host "This is not an AX12 ($model), skipping." -ForegroundColor Yellow
     } else {
@@ -141,11 +151,6 @@ while ($true) {
     $answer = Read-Host "`nConnect the next radio and press Enter (or type Q to quit)"
     if ($answer -match '^[qQ]') {
         break
-    }
-    # Wait for the previous radio to be unplugged so it isn't processed twice
-    while ((& $Adb devices 2>$null) -match "^$([regex]::Escape($serial))\s+device") {
-        Write-Host 'Unplug the previous radio...' -ForegroundColor Yellow
-        Start-Sleep -Seconds 2
     }
 }
 Write-Host "`nDone, $done radio(s) prepared."
