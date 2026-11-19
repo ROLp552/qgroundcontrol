@@ -11,7 +11,7 @@
 #
 # Usage (from this folder):
 #   powershell -ExecutionPolicy Bypass -File .\setup-ax12-radio.ps1
-#   powershell -ExecutionPolicy Bypass -File .\setup-ax12-radio.ps1 -Apk C:\qgc-build\APK\QGroundControl-AX12-v9-rec-tuning.apk
+#   powershell -ExecutionPolicy Bypass -File .\setup-ax12-radio.ps1 -Apk C:\qgc-build\APK\QGroundControl-AX12-v10d-branding.apk
 #   powershell -ExecutionPolicy Bypass -File .\setup-ax12-radio.ps1 -SkipInstall      # only the RadioMaster fix
 #   powershell -ExecutionPolicy Bypass -File .\setup-ax12-radio.ps1 -Once             # one radio, then exit
 #
@@ -19,7 +19,7 @@
 # Radios are told apart by their Android ID: a radio that was just prepared is not processed again.
 
 param(
-    [string]$Apk = 'C:\qgc-build\APK\QGroundControl-AX12-v9-rec-tuning.apk',
+    [string]$Apk = 'C:\qgc-build\APK\QGroundControl-AX12-v10d-branding.apk',
     [switch]$SkipInstall,
     [switch]$Once,      # process a single radio and exit
     [string]$Adb = 'C:\Android\Sdk\platform-tools\adb.exe'

@@ -66,9 +66,16 @@ Rectangle {
         QGCToolBarButton {
             id:                     currentButton
             Layout.preferredHeight: viewButtonRow.height
-            icon.source:            "/res/QGCLogoFull.svg"
+            icon.source:            projectLogo.status === Image.Ready ? projectLogo.source : "/res/QGCLogoFull.svg"
             logo:                   true
             onClicked:              mainWindow.showToolSelectDialog()
+
+            // Optional branding logo (branding/branding.qrc, not in git)
+            Image {
+                id:         projectLogo
+                source:     "qrc:/branding/project_logo.png"
+                visible:    false
+            }
         }
 
         MainStatusIndicator {

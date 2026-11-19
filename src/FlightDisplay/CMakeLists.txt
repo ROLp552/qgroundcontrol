@@ -38,6 +38,7 @@ qt_add_qml_module(FlightDisplayModule
         GuidedActionPause.qml
         GuidedActionRTL.qml
         GuidedActionsController.qml
+        NoVideoBackground.qml
         GuidedActionTakeoff.qml
         GuidedToolStripAction.qml
         GuidedValueSlider.qml

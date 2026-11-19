@@ -289,6 +289,13 @@ if(QGC_BUILD_TESTING)
     list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/test/UnitTest.qrc)
 endif()
 
+# Optional private branding, kept out of git: branding/branding.qrc with project_logo.png (toolbar button)
+# and company_logo.png (no video background). The UI falls back to the stock images without it.
+if(EXISTS ${CMAKE_SOURCE_DIR}/branding/branding.qrc)
+    list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/branding/branding.qrc)
+    message(STATUS "QGC: using branding/branding.qrc")
+endif()
+
 #######################################################
 #               QGroundControl Target
 #######################################################

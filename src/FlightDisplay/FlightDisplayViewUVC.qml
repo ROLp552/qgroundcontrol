@@ -128,12 +128,28 @@ Rectangle {
                         (_fit === 2 ? VideoOutput.Stretch : VideoOutput.PreserveAspectFit)
     }
 
-    QGCLabel {
-        anchors.centerIn:   parent
-        text:               _usbUvcCamera ? _usbUvcCamera.status : ""
-        visible:            _isUsbUvc && _usbUvcCamera && !_usbUvcCamera.streaming
-        color:              "white"
-        font.pointSize:     ScreenTools.largeFontPointSize
+    // No video background until frames arrive, and again when they stop (e.g. source unplugged)
+    property bool _hasFrames: false
+
+    Connections {
+        target: videoOutput.videoSink
+
+        function onVideoFrameChanged() {
+            noFramesTimer.restart()
+            _root._hasFrames = true
+        }
+    }
+
+    Timer {
+        id:             noFramesTimer
+        interval:       1500
+        onTriggered:    _root._hasFrames = false
+    }
+
+    NoVideoBackground {
+        anchors.fill:   parent
+        visible:        !_root._hasFrames
+        text:           (_isUsbUvc && _usbUvcCamera && !_usbUvcCamera.streaming && _usbUvcCamera.status !== "") ? _usbUvcCamera.status : qsTr("WAITING FOR VIDEO")
     }
 
     // Diagnostics for the direct USB capture (Video settings). Tap to switch GPU/CPU color conversion.
